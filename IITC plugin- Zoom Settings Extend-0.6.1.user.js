@@ -2,10 +2,10 @@
 // @id             iitc-plugin-zoom-settings-extend
 // @name           IITC plugin: Zoom Settings Extend
 // @category       d.org.addon
-// @version        0.6.0
+// @version        0.6.1
 // @updateURL      none
 // @downloadURL    none
-// @description    [0.6.0] ズーム倍率ボタンの拡張 (待機処理・安全化強化版)
+// @description    [0.6.1] ズーム倍率ボタンの拡張 (待機処理・安全化強化版)
 // @match          https://intel.ingress.com/*
 // @match          https://intel-x.ingress.com/*
 // @match          http://intel.ingress.com/*
@@ -18,7 +18,7 @@ function wrapper(plugin_info) {
     if(typeof window.plugin !== 'function') window.plugin = function() {};
 
     plugin_info.buildName = 'local';
-    plugin_info.dateTimeVersion = '20260127.060000';
+    plugin_info.dateTimeVersion = '20260127.120000';
     plugin_info.pluginId = 'zoom-settings-extend';
 
     // --- 名前空間の確保 ---
@@ -26,6 +26,10 @@ function wrapper(plugin_info) {
     const self = window.plugin.zoomSettingsExtend;
 
     const STORAGE_KEY = 'plugin-zoom-settings-extend-v1';
+
+    // *************************************************************************
+    // * Block: Settings Management                                            *
+    // *************************************************************************
 
     // デフォルト設定
     self.settings = {
@@ -49,6 +53,10 @@ function wrapper(plugin_info) {
     self.saveSettings = function() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(self.settings));
     };
+
+    // *************************************************************************
+    // * Block: UI / CSS                                                       *
+    // *************************************************************************
 
     // --- CSS注入 (Pure JS) ---
     self.addStyle = function() {
@@ -84,6 +92,10 @@ function wrapper(plugin_info) {
         style.innerHTML = css;
         document.head.appendChild(style);
     };
+
+    // *************************************************************************
+    // * Block: Functional Logic                                               *
+    // *************************************************************************
 
     // --- 機能適用 ---
     self.applySettings = function() {
@@ -160,6 +172,10 @@ function wrapper(plugin_info) {
         }
     }
 
+    // *************************************************************************
+    // * Block: Control Generation                                             *
+    // *************************************************************************
+
     // --- コントロール生成 ---
     self.setupControl = function() {
         if (!window.L || !window.L.Control) {
@@ -214,6 +230,10 @@ function wrapper(plugin_info) {
         window.map.addControl(new ZoomExtendControl());
     };
 
+    // *************************************************************************
+    // * Block: Configuration Dialog                                           *
+    // *************************************************************************
+
     // --- 設定ダイアログ ---
     self.openSettings = function() {
         const html = `
@@ -261,6 +281,10 @@ function wrapper(plugin_info) {
         bindCheck('ze-opt-wheel', 'preventWheel');
     };
 
+    // *************************************************************************
+    // * Block: Initialization                                                 *
+    // *************************************************************************
+
     // --- メイン初期化 (リトライ機構付き) ---
     function init() {
         // マップとLeafletの準備確認
@@ -275,6 +299,19 @@ function wrapper(plugin_info) {
                 console.error('ZoomExtend: Map not ready after retries. Aborting.');
                 return;
             }
+        }
+
+        // --- IITC Override for Fractional Zoom Support ---
+        // IITC assumes integer zoom levels for data fetching (TILE_PARAMS array lookups).
+        // Since this plugin enables fractional zoom (zoomSnap=0.01), we must ensure that
+        // data requests use rounded integer zoom levels to avoid undefined array access
+        // and incorrect tile request parameter calculations (e.g. falling back to max tiles).
+        if (window.getMapZoomTileParameters && !window.getMapZoomTileParameters.isWrappedByZMEx) {
+            const original_getMapZoomTileParameters = window.getMapZoomTileParameters;
+            window.getMapZoomTileParameters = function(zoom) {
+                return original_getMapZoomTileParameters(Math.round(zoom));
+            };
+            window.getMapZoomTileParameters.isWrappedByZMEx = true;
         }
 
         try {
